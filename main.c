@@ -1014,7 +1014,7 @@ char *Verifica_Tipo_Posfixa(){
                 return "0";
             }
 
-        } else if(strcmp(posfixa[i], "snao") == 0 || strcmp(posfixa[i], "e") == 0 || strcmp(posfixa[i], "ou") == 0){
+        } else if(strcmp(posfixa[i], "e") == 0 || strcmp(posfixa[i], "ou") == 0){
             
             op = pop_op(p_tipo);
             op2 = pop_op(p_tipo);
@@ -1022,6 +1022,18 @@ char *Verifica_Tipo_Posfixa(){
             op2 = Pesquisa_Tipo(op2);
 
             if(strcmp(op, "/") == 0 && strcmp(op2, "/") == 0){
+                push(p_tipo, "/", -1, -1, -1);
+            } else {
+                printf("Erro de tipo: operacao logica com tipos invalidos\n");
+                return "0";
+            }
+
+        } else if(strcmp(posfixa[i], "snao") == 0){
+            
+            op = pop_op(p_tipo);
+            op = Pesquisa_Tipo(op);
+
+            if(strcmp(op, "/") == 0){
                 push(p_tipo, "/", -1, -1, -1);
             } else {
                 printf("Erro de tipo: operacao logica com tipos invalidos\n");
