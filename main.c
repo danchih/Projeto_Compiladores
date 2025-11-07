@@ -125,7 +125,7 @@ Token trata_pontuacao(Token T){
     }
     T.lexema[0] = T.caracter;
     T.lexema[1] = '\0';
-    
+
     T.caracter = fgetc(arquivo);
     return T;
 }
@@ -144,7 +144,7 @@ Token trata_operador_aritmetico(Token T){
     }
     T.lexema[0] = T.caracter;
     T.lexema[1] = '\0';
-    
+
     T.caracter = fgetc(arquivo);
     return T;
 }
@@ -280,7 +280,7 @@ Token trata_identificador_palavra(Token T){
         strcpy(T.simbolo, "sidentificador");
     }
     strcpy(T.lexema, id);
-    
+
     //T.caracter = fgetc(arquivo);
     return T;
 }
@@ -426,9 +426,12 @@ Token Analisa_variaveis(Token T){
                         if(strcmp(T.simbolo, "sdoispontos") == 0)
                             printf("[%d] Erro: falta de identificador apos virgula --> (lexema recebido: '%s')\n", linha, T.lexema);
                     }
+                } else{
+                    printf("[%d] Erro: falta de pontuacao na declaracao de variavel --> (lexema recebido: '%s')\n", linha, T.lexema);
                 }
             }else{
                 printf("[%d] Erro: variavel '%s' ja declarada anteriormente\n", linha, T.lexema);
+                T = Analisador_Lexico(T);
             }
         } else {
             printf("[%d] Erro: declaracao de variavel incorreta --> (lexema recebido: '%s')\n", linha, T.lexema);
@@ -440,6 +443,7 @@ Token Analisa_variaveis(Token T){
     }
     T = Analisador_Lexico(T);
     T = Analisa_Tipo(T);
+    counter = 0;
     return T;
 }
 
@@ -524,7 +528,7 @@ Token Analisa_declaracao_funcao(Token T){
         } else {
             printf("[%d] Erro: funcao '%s' ja declarada anteriormente\n", linha, T.lexema);
         }
-        
+
     } else {
         printf("[%d] Erro ao identificar a declaracao da funcao --> (lexema recebido: '%s')\n", linha, T.lexema);
     }
@@ -563,6 +567,9 @@ Token Analisa_comandos(Token T) {
 
 Token Analisa_comando_simples(Token T){
     if(strcmp(T.simbolo, "sidentificador")==0){
+        if(Pesquisa_duplicvar_tabela(T.lexema) == 0){
+            printf("[%d] Erro: variavel '%s' nao declarada anteriormente\n", linha, T.lexema);
+        }
         T = Analisa_atrib_chprocedimento(T);
     } else if(strcmp(T.simbolo, "sse")==0){
         T = Analisa_se(T);
@@ -596,7 +603,7 @@ Token Analisa_comando_atribuicao(Token T, Token T_var){
 
     T = Analisador_Lexico(T);
     T = Analisa_expressao(T);
-    
+
     while(!vaziaPilha(pilha_op)){
         op = pop_op(pilha_op);
         strcpy(posfixa[conta_string], op);
@@ -606,7 +613,7 @@ Token Analisa_comando_atribuicao(Token T, Token T_var){
 
     if(strcmp(Pesquisa_Tipo(T_var.lexema), tipo_posfixa) != 0){
         printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na atribuicao\n", linha);
-    } 
+    }
     // print do posfixa
     // for (int i = 0; i < conta_string; i++) {
     //     printf("%s ", posfixa[i]);
@@ -642,7 +649,7 @@ Token Analisa_se(Token T){
 
     if(strcmp(tipo_posfixa, "/") != 0){
         printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na funcao SE\n", linha);
-    } 
+    }
 
     if(strcmp(T.simbolo, "sentao")== 0){
         T = Analisador_Lexico(T);
@@ -673,7 +680,7 @@ Token Analisa_enquanto(Token T){
 
     if(strcmp(tipo_posfixa, "/") != 0){
         printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na funcao ENQUANTO\n", linha);
-    } 
+    }
 
     if(strcmp(T.simbolo, "sfaca")== 0){
         T = Analisador_Lexico(T);
@@ -847,7 +854,7 @@ void Converte_posfixa(Token T){
        strcmp(T.simbolo, "se")== 0 || strcmp(T.simbolo, "sou")== 0 ||
        strcmp(T.simbolo, "snao")== 0 || strcmp(T.simbolo, "sabre_parenteses")== 0 ||
        strcmp(T.simbolo, "snegativo") == 0 || strcmp(T.simbolo, "spositivo") == 0){
-           
+
             // Processamento de operadores
             if(strcmp(T.simbolo, "sabre_parenteses")!= 0){
                 while(!vaziaPilha(pilha_op) && (Precedencia_topo(pilha_op) >= Precedencia_atual(T)) && (Precedencia_topo(pilha_op) != 8)){
@@ -859,14 +866,14 @@ void Converte_posfixa(Token T){
 
            if(strcmp(T.simbolo, "spositivo") == 0) {
                 push(pilha_op, "@", -1, -1, -1);
-           } 
+           }
            else if(strcmp(T.simbolo, "snegativo") == 0){
                 push(pilha_op, "$", -1, -1, -1);
-           } 
+           }
            else{
                 push(pilha_op, T.lexema, -1, -1, -1);
            }
-           
+
     } else if (strcmp(T.simbolo, "sfecha_parenteses")== 0){
         op = pop_op(pilha_op);
         // Processamento de fechamento de parenteses
@@ -884,7 +891,7 @@ void Converte_posfixa(Token T){
         strcpy(posfixa[conta_string], T.lexema);
         conta_string++;
     }
-    
+
 }
 
 int Precedencia_topo(Pilha *p){
@@ -954,7 +961,7 @@ char *Verifica_Tipo_Posfixa(){
 
         if(strcmp(posfixa[i], "+") == 0 || strcmp(posfixa[i], "-") == 0 ||
            strcmp(posfixa[i], "*") == 0 || strcmp(posfixa[i], "div") == 0){
-            
+
             op = pop_op(p_tipo);
             op2 = pop_op(p_tipo);
             op = Pesquisa_Tipo(op);
@@ -967,9 +974,9 @@ char *Verifica_Tipo_Posfixa(){
                 return "0";
             }
 
-        }else if (strcmp(posfixa[i], ">") == 0 || strcmp(posfixa[i], "<") == 0 || 
+        }else if (strcmp(posfixa[i], ">") == 0 || strcmp(posfixa[i], "<") == 0 ||
                   strcmp(posfixa[i], ">=") == 0 || strcmp(posfixa[i], "<=") == 0){
-            
+
             op = pop_op(p_tipo);
             op2 = pop_op(p_tipo);
             op = Pesquisa_Tipo(op);
@@ -992,7 +999,7 @@ char *Verifica_Tipo_Posfixa(){
 
             if(strcmp(op, "#") == 0 && strcmp(op2, "#") == 0){
                 push(p_tipo, "/", -1, -1, -1);
-                
+
             } else if(strcmp(op, "/") == 0 && strcmp(op2, "/") == 0){
                 push(p_tipo, "/", -1, -1, -1);
 
@@ -1002,7 +1009,7 @@ char *Verifica_Tipo_Posfixa(){
             }
 
         } else if(strcmp(posfixa[i], "@") == 0 || strcmp(posfixa[i], "$") == 0){
-            
+
             op = pop_op(p_tipo);
             op = Pesquisa_Tipo(op);
 
@@ -1015,7 +1022,7 @@ char *Verifica_Tipo_Posfixa(){
             }
 
         } else if(strcmp(posfixa[i], "e") == 0 || strcmp(posfixa[i], "ou") == 0){
-            
+
             op = pop_op(p_tipo);
             op2 = pop_op(p_tipo);
             op = Pesquisa_Tipo(op);
@@ -1029,7 +1036,7 @@ char *Verifica_Tipo_Posfixa(){
             }
 
         } else if(strcmp(posfixa[i], "snao") == 0){
-            
+
             op = pop_op(p_tipo);
             op = Pesquisa_Tipo(op);
 
@@ -1055,7 +1062,7 @@ char *Pesquisa_Tipo(char* simbolo){
 
     if(isdigit(simbolo[0])){
         return "#"; // inteiro
-    } 
+    }
     else if (strcmp(simbolo, "verdadeiro") == 0 || strcmp(simbolo, "falso") == 0){
         return "/"; // booleano
     }
@@ -1067,7 +1074,7 @@ char *Pesquisa_Tipo(char* simbolo){
                 } else if (q->tipo == 3 || q->tipo == 6){
                     return "/"; // booleano
                 }
-            } 
+            }
             q = q->prox;
         }
     }
@@ -1102,47 +1109,47 @@ int Pesquisa_declvar_tabela(char* nome_variavel){
     if(consulta_primeira_ocorrencia_variavel(pilha, nome_variavel) != NULL){
         return 1;
     }
-    return 0; 
+    return 0;
 }
 
 int Pesquisa_declvarfunc_tabela(char* nome_variavel){
     // Verifica se a variavel ja foi declarada
     if(consulta_primeira_ocorrencia_funcao_e_variavel(pilha, nome_variavel) != NULL){
-        return 1; 
+        return 1;
     }
-    return 0; 
+    return 0;
 }
 
 int Pesquisa_declproc_tabela(char* nome_procedimento){
     // Verifica se o procedimento ja foi declarado
     if(consulta_procedimento_escopo(pilha, nome_procedimento) != NULL){
-        return 1; 
+        return 1;
     }
-    return 0; 
+    return 0;
 }
 
 int Pesquisa_declfunc_tabela(char* nome_funcao){
     // Verifica se a funcao ja foi declarada
     if(consulta_funcao_escopo(pilha, nome_funcao) != NULL){
-        return 1; 
+        return 1;
     }
-    return 0; 
+    return 0;
 }
 
 int Pesquisa_champroc_tabela(char* nome_procedimento){
     // Verifica se a funcao ja foi declarada
     if(consulta_primeira_ocorrencia_procedimento(pilha, nome_procedimento) != NULL){
-        return 1; 
+        return 1;
     }
-    return 0; 
+    return 0;
 }
 
 int Pesquisa_chamfuncao_tabela(char* nome_funcao){
     // Verifica se a funcao ja foi declarada
     if(consulta_primeira_ocorrencia_funcao(pilha, nome_funcao) != NULL){
-        return 1; 
+        return 1;
     }
-    return 0; 
+    return 0;
 }
 
 void Desempilha_volta_nivel(Pilha* p){
