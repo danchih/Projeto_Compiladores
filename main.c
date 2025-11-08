@@ -73,9 +73,23 @@ void Desempilha_volta_nivel(Pilha* p);
 
 // Funcao Principal =========================================================================================================
 
-int main()
+int main(int argc, char *argv[])
 {
-    arquivo = fopen("teste.txt", "r");
+    setvbuf(stdout, NULL, _IONBF, 0); // <<< Desativa buffer de stdout
+    setvbuf(stderr, NULL, _IONBF, 0); // desativa buffer de erro também
+
+    if (argc < 2) {
+        printf("Uso: %s <arquivo_fonte>\n", argv[0]);
+        return 1;
+    }
+
+    arquivo = fopen(argv[1], "r");
+    if (arquivo == NULL) {
+        printf("Erro: não foi possível abrir o arquivo '%s'\n", argv[1]);
+        return 1;
+    }
+    //arquivo = fopen("teste.txt", "r");
+
     Token T;
     pilha = CriaPilha();
     pilha_op = CriaPilha();
@@ -189,7 +203,7 @@ Token trata_operador_relacional(Token T){
             simbolo = "sdif";
             T.caracter = fgetc(arquivo);
         } else {
-            printf("Erro: Ausencia do = para o lexema != \n");
+            printf("[%d] Erro: Ausencia do = para o lexema != \n", linha);
         }
     // Verifica se caracter e =
     } else {
@@ -299,7 +313,7 @@ Token Pega_Token(Token T){
     } else if ((T.caracter == 59) || (T.caracter == 44) || (T.caracter == 41) || (T.caracter == 46)|| (T.caracter == 40)){
         T = trata_pontuacao(T);
     } else {
-        printf("Erro: caracter nao encontrado\n");
+        printf("[%d] Erro: caracter nao encontrado\n", linha);
         T.caracter = fgetc(arquivo);
 
     }
@@ -345,19 +359,19 @@ void Analisador_sintatico(Token T){
                     if(T.caracter == EOF){
                         printf("Termino de programa\n");
                     } else {
-                        printf("[%d] Erro ao terminar programa --> (lexema recebido: '%s')\n", linha, T.lexema);
+                        printf("[%d] Erro ao terminar programa\n", linha);
                     }
                 } else {
-                    printf("[%d] Erro: falta de . apos o termino do bloco --> (lexema recebido: '%s')\n", linha, T.lexema);
+                    printf("[%d] Erro: falta de . apos o termino do bloco \n", linha);
                 }
             } else {
-                printf("[%d] Erro: falta de ; ao iniciar o programa --> (lexema recebido: '%s')\n", linha, T.lexema);
+                printf("[%d] Erro: falta de ; ao iniciar o programa \n", linha);
             }
         } else {
-            printf("[%d] Erro ao identificar programa --> (lexema recebido: '%s')\n", linha, T.lexema);
+            printf("[%d] Erro ao identificar programa \n", linha);
         }
     } else {
-        printf("[%d] Erro ao iniciar programa --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro ao iniciar programa \n", linha);
     }
 }
 
@@ -370,12 +384,12 @@ Token Analisa_bloco(Token T){
            (strcmp(T.simbolo, "sinicio") != 0) &&
            (T.caracter != EOF)) {
 
-        printf("[%d] Aviso: simbolo inesperado '%s' -> ignorado\n", linha, T.lexema);
+        printf("[%d] Aviso: simbolo inesperado '%s' (ignorado) \n", linha, T.lexema);
 
         T = Analisador_Lexico(T);
     }
     if (T.caracter == EOF) {
-        printf("[%d] Erro: fim de arquivo inesperado ---> Erro ao iniciar bloco --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro: fim de arquivo inesperado (Erro ao iniciar bloco) \n", linha);
         return T;
     }
 
@@ -401,11 +415,11 @@ Token Analisa_et_variavel(Token T){
                 if(strcmp(T.simbolo, "sponto_virgula")== 0){
                     T = Analisador_Lexico(T);
                 } else {
-                    printf("[%d] Erro: falta ; apos a declaracao das variavel --> (lexema recebido: '%s')\n", T.lexema);
+                    printf("[%d] Erro: falta ; apos a declaracao das variavel \n", linha);
                 }
             }
         } else {
-            printf("[%d] Erro ao declarar variavel --> (lexema recebido: '%s')\n", linha, T.lexema);
+            printf("[%d] Erro ao declarar variavel \n", linha);
         }
     }
     return T;
@@ -424,22 +438,22 @@ Token Analisa_variaveis(Token T){
                     if(strcmp(T.simbolo, "svirgula") == 0){
                         T = Analisador_Lexico(T);
                         if(strcmp(T.simbolo, "sdoispontos") == 0)
-                            printf("[%d] Erro: falta de identificador apos virgula --> (lexema recebido: '%s')\n", linha, T.lexema);
+                            printf("[%d] Erro: falta de identificador apos virgula\n", linha);
                     }
                 } else{
-                    printf("[%d] Erro: falta de pontuacao na declaracao de variavel --> (lexema recebido: '%s')\n", linha, T.lexema);
+                    printf("[%d] Erro: falta de pontuacao na declaracao de variavel\n", linha);
                 }
             }else{
-                printf("[%d] Erro: variavel '%s' ja declarada anteriormente\n", linha, T.lexema);
+                printf("[%d] Erro: variavel '%s' ja declarada anteriormente \n", linha, T.lexema);
                 T = Analisador_Lexico(T);
             }
         } else {
-            printf("[%d] Erro: declaracao de variavel incorreta --> (lexema recebido: '%s')\n", linha, T.lexema);
+            printf("[%d] Erro: declaracao de variavel incorreta \n", linha);
         }
     }while(strcmp(T.simbolo, "sdoispontos") != 0 && strcmp(T.simbolo, "sponto_virgula") != 0 && T.caracter != EOF);
 
     if(strcmp(T.simbolo, "sdoispontos") != 0){
-        printf("[%d] Erro: falta ':' na declaracao de variavel --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro: falta ':' na declaracao de variavel\n", linha);
     }
     T = Analisador_Lexico(T);
     T = Analisa_Tipo(T);
@@ -449,7 +463,7 @@ Token Analisa_variaveis(Token T){
 
 Token Analisa_Tipo(Token T){
     if((strcmp(T.simbolo, "sinteiro") != 0) && (strcmp(T.simbolo, "sbooleano") != 0)){
-        printf("[%d] Erro: tipo de variavel incorreto --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro: tipo de variavel invalido \n", linha);
     }else{
         Pesquisa_tipo_tabela(T.simbolo);
     }
@@ -468,7 +482,7 @@ Token Analisa_subrotinas(Token T){
        if(strcmp(T.simbolo, "sponto_virgula")== 0){
             T = Analisador_Lexico(T);
        } else {
-            printf("[%d] Erro: falta ; apos a declaracao da subrotina --> (lexema recebido: '%s')\n", linha, T.lexema);
+            printf("[%d] Erro: falta ; apos a declaracao da subrotina \n", linha);
        }
     }
     return T;
@@ -484,13 +498,13 @@ Token Analisa_declaracao_procedimento(Token T){
             if(strcmp(T.simbolo, "sponto_virgula")== 0){
                 T = Analisa_bloco(T);
             } else {
-                printf("[%d] Erro: falta ; na declaracao do procedimento --> (lexema recebido: '%s')\n", linha, T.lexema);
+                printf("[%d] Erro: falta ; na declaracao do procedimento \n", linha);
             }
         } else {
             printf("[%d] Erro: procedimento '%s' ja declarado anteriormente\n", linha, T.lexema);
         }
     } else {
-        printf("[%d] Erro ao identificar a declaracao do procedimento\n", linha, T.lexema);
+        printf("[%d] Erro ao identificar a declaracao do procedimento \n", linha);
     }
     Desempilha_volta_nivel(pilha);
     return T;
@@ -517,20 +531,20 @@ Token Analisa_declaracao_funcao(Token T){
                         T = Analisa_bloco(T);
                     }
                     else{
-                        printf("[%d] Erro: falta ; na declaracao da funcao --> (lexema recebido: '%s')\n", linha, T.lexema);
+                        printf("[%d] Erro: falta ; na declaracao da funcao \n", linha);
                     }
                 } else {
-                    printf("[%d] Erro: Tipo nao correspondente (inteiro/booleano) na declaracao da funcao --> (lexema recebido: '%s')\n", linha, T.lexema);
+                    printf("[%d] Erro: Tipo nao correspondente (inteiro/booleano) na declaracao da funcao \n", linha);
                 }
             } else {
-                printf("[%d] Erro: ausencia de : na declaracao da funcao --> (lexema recebido: '%s')\n", linha, T.lexema);
+                printf("[%d] Erro: ausencia de : na declaracao da funcao \n", linha);
             }
         } else {
             printf("[%d] Erro: funcao '%s' ja declarada anteriormente\n", linha, T.lexema);
         }
 
     } else {
-        printf("[%d] Erro ao identificar a declaracao da funcao --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro ao identificar a declaracao da funcao \n", linha);
     }
     Desempilha_volta_nivel(pilha);
     return T;
@@ -548,7 +562,7 @@ Token Analisa_comandos(Token T) {
                     T = Analisa_comando_simples(T);
                 }
             } else {
-                printf("[%d] Erro: esperado ';' ao final da analise do comando --> (lexema recebido: '%s')\n", linha, T.lexema);
+                printf("[%d] Erro: esperado ';' ao final da analise do comando \n", linha);
                 T = Analisador_Lexico(T);
             }
         }
@@ -556,10 +570,10 @@ Token Analisa_comandos(Token T) {
         if (strcmp(T.simbolo, "sfim") == 0) {
             T = Analisador_Lexico(T);
         } else {
-            printf("[%d] Erro: esperado 'fim' ao finalizar comando --> (lexema recebido: '%s')\n", linha, T.lexema);
+            printf("[%d] Erro: esperado 'fim' ao finalizar comando \n", linha);
         }
     } else {
-        printf("[%d] Erro: esperado 'inicio' ao inicializar comando --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro: esperado 'inicio' ao inicializar comando \n", linha);
     }
 
     return T;
@@ -582,7 +596,7 @@ Token Analisa_comando_simples(Token T){
     } else if(strcmp(T.simbolo, "sinicio")==0){
         T = Analisa_comandos(T);
     } else{
-        printf("[%d] Erro: comando invalido  --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro: comando invalido \n", linha);
     }
     return T;
 }
@@ -612,7 +626,7 @@ Token Analisa_comando_atribuicao(Token T, Token T_var){
     tipo_posfixa = Verifica_Tipo_Posfixa();
 
     if(strcmp(Pesquisa_Tipo(T_var.lexema), tipo_posfixa) != 0){
-        printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na atribuicao\n", linha);
+        printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na atribuicao \n", linha);
     }
     // print do posfixa
     // for (int i = 0; i < conta_string; i++) {
@@ -626,10 +640,10 @@ Token Analisa_chamada_procedimento(Token T){
         if (Pesquisa_champroc_tabela(T.lexema) == 1){
             T = Analisador_Lexico(T);
         } else {
-            printf("[%d] Erro: procedimento '%s' nao declarado anteriormente\n", linha, T.lexema);
+            printf("[%d] Erro: procedimento '%s' nao declarado anteriormente \n", linha, T.lexema);
         }
     } else {
-        printf("[%d] Erro ao identificar chamada de procedimento --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro ao identificar chamada de procedimento \n", linha);
     }
     return T;
 }
@@ -648,7 +662,7 @@ Token Analisa_se(Token T){
     tipo_posfixa = Verifica_Tipo_Posfixa();
 
     if(strcmp(tipo_posfixa, "/") != 0){
-        printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na funcao SE\n", linha);
+        printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na funcao SE \n", linha);
     }
 
     if(strcmp(T.simbolo, "sentao")== 0){
@@ -659,7 +673,7 @@ Token Analisa_se(Token T){
             T = Analisa_comando_simples(T);
         }
     } else {
-        printf("[%d] Erro sintatico do comando SE (ausencia do ENTAO) --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro sintatico do comando SE (ausencia do ENTAO) \n", linha);
     }
     return T;
 }
@@ -679,14 +693,14 @@ Token Analisa_enquanto(Token T){
     tipo_posfixa = Verifica_Tipo_Posfixa();
 
     if(strcmp(tipo_posfixa, "/") != 0){
-        printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na funcao ENQUANTO\n", linha);
+        printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na funcao ENQUANTO \n", linha);
     }
 
     if(strcmp(T.simbolo, "sfaca")== 0){
         T = Analisador_Lexico(T);
         T = Analisa_comando_simples(T);
     } else {
-        printf("[%d] Erro sintatico do comando ENQUANTO (ausencia do FACA) --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro sintatico do comando ENQUANTO (ausencia do FACA) \n", linha);
     }
     return T;
 }
@@ -701,16 +715,16 @@ Token Analisa_leia(Token T){
                 if (strcmp(T.simbolo, "sfecha_parenteses")==0){
                     T = Analisador_Lexico(T);
                 } else {
-                    printf("[%d] Erro: ausencia de ')' no final do comando LEIA --> (lexema recebido: '%s')\n", linha, T.lexema);
+                    printf("[%d] Erro: ausencia de ')' no final do comando LEIA \n", linha);
                 }
             }else{
                 printf("[%d] Erro: variavel '%s' nao declarada anteriormente\n", linha, T.lexema);
             }
         } else{
-            printf("[%d] Erro ao fazer a leitura (necessario um identificador) --> (lexema recebido: '%s')\n", linha, T.lexema);
+            printf("[%d] Erro ao fazer a leitura (necessario um identificador) \n", linha);
         }
     } else {
-        printf("[%d] Erro: ausencia de '(' no inicio do comando LEIA --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro: ausencia de '(' no inicio do comando LEIA \n", linha);
     }
     return T;
 }
@@ -725,16 +739,16 @@ Token Analisa_escreva(Token T){
                 if(strcmp(T.simbolo, "sfecha_parenteses")== 0){
                 T = Analisador_Lexico(T);
                 } else {
-                    printf("[%d] Erro: ausencia de ')' no final do comando ESCREVA --> (lexema recebido: '%s')\n", linha, T.lexema);
+                    printf("[%d] Erro: ausencia de ')' no final do comando ESCREVA \n", linha);
                 }
             }else{
                 printf("[%d] Erro: variavel/funcao '%s' nao declarada anteriormente\n", linha, T.lexema);
             }
         } else {
-            printf("[%d] Erro ao fazer a escrita (necessario um identificador) --> (lexema recebido: '%s')\n", linha, T.lexema);
+            printf("[%d] Erro ao fazer a escrita (necessario um identificador) \n", linha);
         }
     } else {
-        printf("[%d] Erro: ausencia de '(' no inicio do comando ESCREVA --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro: ausencia de '(' no inicio do comando ESCREVA \n", linha);
     }
     return T;
 }
@@ -817,14 +831,14 @@ Token Analisa_fator(Token T){
             T = Analisador_Lexico(T);
 
         } else {
-            printf("[%d] Erro: ausencia de ) na analise do fator apos sua abertura --> (lexema recebido: '%s')\n", linha, T.lexema);
+            printf("[%d] Erro: ausencia de ) na analise do fator apos sua abertura \n", linha);
         }
     } else if((strcmp(T.lexema, "verdadeiro")== 0) || (strcmp(T.lexema, "falso")== 0)){
         Converte_posfixa(T);
         T = Analisador_Lexico(T);
 
     } else {
-        printf("[%d] Erro ao fazer a analise do fator --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro ao fazer a analise do fator \n", linha);
     }
     return T;
 }
@@ -838,7 +852,7 @@ Token Analisa_chamada_funcao(Token T){
             printf("[%d] Erro: funcao '%s' nao declarada anteriormente\n", linha, T.lexema);
         }
     } else {
-        printf("[%d] Erro ao identificar chamada de funcao/variavel --> (lexema recebido: '%s')\n", linha, T.lexema);
+        printf("[%d] Erro ao identificar chamada de funcao/variavel \n", linha);
     }
     return T;
 }
@@ -970,7 +984,7 @@ char *Verifica_Tipo_Posfixa(){
             if(strcmp(op, "#") == 0 && strcmp(op2, "#") == 0){
                 push(p_tipo, "#", -1, -1, -1);
             } else {
-                printf("Erro de tipo: operacao aritmetica com tipos invalidos\n");
+                printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
                 return "0";
             }
 
@@ -986,7 +1000,7 @@ char *Verifica_Tipo_Posfixa(){
                 push(p_tipo, "/", -1, -1, -1);
 
             } else {
-                printf("Erro de tipo: operacao aritmetica com tipos invalidos\n");
+                printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
                 return "0";
             }
 
@@ -1004,7 +1018,7 @@ char *Verifica_Tipo_Posfixa(){
                 push(p_tipo, "/", -1, -1, -1);
 
             } else {
-                printf("Erro de tipo: operacao aritmetica com tipos invalidos\n");
+                printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
                 return "0";
             }
 
@@ -1017,7 +1031,7 @@ char *Verifica_Tipo_Posfixa(){
                 push(p_tipo, "#", -1, -1, -1);
 
             } else {
-                printf("Erro de tipo: operacao aritmetica com tipos invalidos\n");
+                printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
                 return "0";
             }
 
@@ -1031,11 +1045,11 @@ char *Verifica_Tipo_Posfixa(){
             if(strcmp(op, "/") == 0 && strcmp(op2, "/") == 0){
                 push(p_tipo, "/", -1, -1, -1);
             } else {
-                printf("Erro de tipo: operacao logica com tipos invalidos\n");
+                printf("[%d] Erro: operacao logica com tipos invalidos \n", linha);
                 return "0";
             }
 
-        } else if(strcmp(posfixa[i], "snao") == 0){
+        } else if(strcmp(posfixa[i], "nao") == 0){
 
             op = pop_op(p_tipo);
             op = Pesquisa_Tipo(op);
@@ -1043,7 +1057,7 @@ char *Verifica_Tipo_Posfixa(){
             if(strcmp(op, "/") == 0){
                 push(p_tipo, "/", -1, -1, -1);
             } else {
-                printf("Erro de tipo: operacao logica com tipos invalidos\n");
+                printf("[%d] Erro: operacao logica com tipos invalidos \n", linha);
                 return "0";
             }
 

@@ -1,10 +1,19 @@
 {Teste 1 - OK}
 programa test1;
 
-var x,a: inteiro;
+var x, a: inteiro;
 
 inicio
-    x := a + 2
+    x := x + 2
 fim.
 
 {fim}
+
+
+
+
+
+
+
+
+
