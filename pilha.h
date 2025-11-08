@@ -35,7 +35,7 @@ Pilha *CriaPilha(void)
 {
    Pilha *p = (Pilha *)malloc(sizeof(Pilha));
    if (!p) {
-      fprintf(stderr, "Erro de alocacao em CriaPilha\n");
+      //fprintf(stderr, "Erro de alocacao em criar a pilha\n");
       exit(1);
    }
    p->Topo = NULL;
@@ -47,7 +47,7 @@ No *ins_ini(No *topo, const char *l, int e, int t, int m)
 {
    No *aux = (No *)malloc(sizeof(No));
    if (!aux) {
-       fprintf(stderr, "Erro de alocacao em ins_ini\n");
+       //fprintf(stderr, "Erro de alocacao na insercao de um elemento na pilha\n");
        exit(1);
    }
    if (l)
@@ -84,7 +84,7 @@ void pop(Pilha *p)
    if (p == NULL || p->Topo == NULL)
    {
       /* Pilha vazia: apenas ignora ou você pode tratar como erro */
-      fprintf(stderr, "pop: Pilha vazia.\n");
+      //fprintf(stderr, "Erro: Remocao invalida. Pilha esta vazia.\n");
       return;
    }
    p->Topo = ret_ini(p->Topo);
@@ -98,14 +98,14 @@ char *pop_op(Pilha *p)
 {
    if (p == NULL || p->Topo == NULL)
    {
-      fprintf(stderr, "pop_op: Pilha vazia.\n");
+      //fprintf(stderr, "Erro: Remocao invalida. Pilha esta vazia.\n");
       return NULL;
    }
 
    /* Faz cópia do lexema antes de liberar o nó */
    char *lexema_copy = (char *)malloc(strlen(p->Topo->lexema) + 1);
    if (!lexema_copy) {
-       fprintf(stderr, "pop_op: Erro de alocacao\n");
+       //fprintf(stderr, "Erro de alocacao na remocao do elemento na pilha\n");
        exit(1);
    }
    strcpy(lexema_copy, p->Topo->lexema);
@@ -136,7 +136,7 @@ void imprimePilha(Pilha *p)
    No *q;
    if (!p || p->Topo == NULL)
    {
-      printf("\n\n\tPILHA VAZIA!!!!\n\n");
+      printf("Erro de impressao. Pilha esta vazia\n");
       return;
    }
 

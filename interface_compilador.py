@@ -7,6 +7,7 @@ import re
 
 COMPILADOR_EXEC = "main.exe"  # ou "./main" no Linux
 arquivo_atual = None
+saida_compilador = ""
 
 
 # ---------- Funções principais ----------
@@ -25,6 +26,7 @@ def abrir_arquivo():
             arquivo_atual = caminho
             status_label.config(text=f"Arquivo aberto: {caminho}")
             limpar_saida()
+            limpar_destaques()
             atualizar_linhas()
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao abrir o arquivo:\n{e}")
@@ -49,27 +51,52 @@ def limpar_saida():
     saida_text.config(state="disabled")
 
 
+def limpar_destaques():
+    # remove tag se existir
+    try:
+        entrada_text.tag_delete("erro_linha")
+    except tk.TclError:
+        pass
+
+
 def exibir_saida(texto):
-    """Exibe texto na área de saída, colorindo se for erro"""
-    def inserir():
-        saida_text.config(state="normal")
-        saida_text.insert(tk.END, texto)
-        saida_text.see(tk.END)
-        saida_text.config(state="disabled")
+    """Exibe texto na área de saída"""
+    saida_text.config(state="normal")
+    saida_text.insert(tk.END, texto)
+    saida_text.see(tk.END)
+    saida_text.config(state="disabled")
 
-        # Detecta "linha X" e destaca
-        match = re.search(r"[Ll]inha\s+(\d+)", texto)
-        if match:
-            linha = match.group(1)
-            saida_text.tag_add("erro", "end-2l linestart", "end-2l lineend")
-            saida_text.tag_config("erro", foreground="red", font=("Consolas", 10, "bold"))
-            status_label.config(text=f"Erro detectado na linha {linha}")
 
-    janela.after(0, inserir)
+def destacar_erros():
+    """Procura todas as linhas [n] nos erros e destaca no editor"""
+    global saida_compilador
+
+    limpar_destaques()
+    entrada_text.tag_config("erro_linha", background="#ffcccc")
+
+    # Captura todas as ocorrências do padrão [n]
+    linhas_erro = re.findall(r"\[(\d+)\]", saida_compilador)
+
+    if not linhas_erro:
+        status_label.config(text="Nenhum erro detectado.")
+        return
+
+    for num in linhas_erro:
+        linha = int(num)
+        start = f"{linha}.0"
+        end = f"{linha}.0 lineend"
+        try:
+            entrada_text.tag_add("erro_linha", start, end)
+        except tk.TclError:
+            pass
+
+    # scroll para o primeiro erro
+    entrada_text.see(f"{linhas_erro[0]}.0")
+    status_label.config(text=f"Erros detectados nas linhas: {', '.join(linhas_erro)}")
 
 
 def compilar():
-    global arquivo_atual
+    global arquivo_atual, saida_compilador
     if not arquivo_atual:
         messagebox.showinfo("Compilar", "Abra um arquivo antes de compilar.")
         return
@@ -80,27 +107,38 @@ def compilar():
 
     salvar_edicoes()
     limpar_saida()
+    limpar_destaques()
+    saida_compilador = ""
     status_label.config(text="Compilando...")
 
     def thread_exec():
-        # Usa shell=True no Windows para garantir o flush imediato
+        # declarar global para atualizar a variável global dentro da thread
+        global saida_compilador
+        # Ajuste de shell: em Windows costuma ser True para executáveis, em Linux deixe False
+        use_shell = os.name == "nt"
         process = subprocess.Popen(
             [COMPILADOR_EXEC, arquivo_atual],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            shell=True,
+            shell=use_shell,
             bufsize=1,
             universal_newlines=True
         )
 
+        # leia linhas enquanto o processo produzir saída
         for line in iter(process.stdout.readline, ''):
             if line:
-                exibir_saida(line)
+                saida_compilador += line
+                # exibe imediatamente
+                janela.after(0, lambda l=line: exibir_saida(l))
 
         process.stdout.close()
         process.wait()
-        status_label.config(text="Compilação finalizada.")
+
+        # Quando terminar, destaca os erros (após um pequeno delay para garantir UI pronta)
+        janela.after(100, destacar_erros)
+        janela.after(0, lambda: status_label.config(text="Compilação finalizada."))
 
     threading.Thread(target=thread_exec, daemon=True).start()
 
@@ -157,8 +195,10 @@ tk.Button(botoes_frame, text="Salvar", command=salvar_edicoes).pack(side="left",
 tk.Button(botoes_frame, text="Compilar", command=compilar).pack(side="left", padx=10)
 
 tk.Label(janela, text="Saída do Compilador:").pack(anchor="w", padx=10, pady=5)
+
 saida_text = tk.Text(janela, height=12, bg="#f5f5f5", font=("Consolas", 10), state="disabled")
 saida_text.pack(padx=10, pady=5, fill="x")
+saida_text.bind("<Key>", lambda e: "break")
 
 status_label = tk.Label(janela, text="Pronto.", anchor="w", fg="gray")
 status_label.pack(fill="x", padx=10, pady=5)
