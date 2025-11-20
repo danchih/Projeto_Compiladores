@@ -5,13 +5,24 @@
 #include "pilha.h"
 
 FILE *arquivo;
+FILE *arquivo_obj;
+char *nome_arquivo;
+
 int linha = 1;
+
 Pilha* pilha = NULL;
-int end = 0;
-int rotulo = 0;
 Pilha* pilha_op = NULL;
+Pilha* pilha_counter = NULL;
 char posfixa[250][100];
 int conta_string = 0;
+
+char rotulo_str[5];
+char c = 'L';
+int end = 1;
+char end_str[20];
+char counter_str[20];
+int rotulo = 1;
+int counter = 0;
 
 typedef struct{
     char lexema[50];
@@ -29,6 +40,9 @@ Token trata_atribuicao(Token T);
 Token trata_identificador_palavra(Token T);
 Token Pega_Token(Token T);
 Token Analisador_Lexico(Token T);
+
+char *mudar_extensao_para_obj(const char *caminho_original);
+
 // Analisadores Sintaticos
 void Analisador_sintatico(Token T);
 Token Analisa_bloco(Token T);
@@ -53,17 +67,21 @@ Token Analisa_termo(Token T);
 Token Analisa_fator(Token T);
 Token Analisa_chamada_funcao(Token T);
 
+// Funcoes de Conversao para Posfixa
 void Converte_posfixa(Token T);
 int Precedencia_topo(Pilha *p);
 int Precedencia_atual(Token T);
 char *Verifica_Tipo_Posfixa();
 char *Pesquisa_Tipo(char* simbolo);
 
+void Gera_Codigo(char* rot, char* comando, char* tipo1, char* tipo2);
+
 // Funcoes de Pesquisa na Tabela de Simbolos
 int Pesquisa_duplicvar_tabela(char* nome_variavel);
 void Pesquisa_tipo_tabela(char* simbolo);
 int Pesquisa_declvar_tabela(char* nome_variavel);
-int Pesquisa_declvarfunc_tabela(char* nome_variavel);
+int Pesquisa_primeira_marca_tabela();
+int Pesquisa_declfuncao_existe_tabela(char* nome_variavel);
 int Pesquisa_declproc_tabela(char* nome_procedimento);
 int Pesquisa_declfunc_tabela(char* nome_funcao);
 int Pesquisa_champroc_tabela(char* nome_procedimento);
@@ -88,11 +106,16 @@ int main(int argc, char *argv[])
         printf("Erro: não foi possível abrir o arquivo '%s'\n", argv[1]);
         return 1;
     }
-    //arquivo = fopen("teste.txt", "r");
+
+    nome_arquivo = mudar_extensao_para_obj(argv[1]);
+
+    // arquivo = fopen("teste.txt", "r");
+    // nome_arquivo = "teste.obj";
 
     Token T;
     pilha = CriaPilha();
     pilha_op = CriaPilha();
+    pilha_counter = CriaPilha();
 
     T.caracter = fgetc(arquivo);
 
@@ -101,6 +124,38 @@ int main(int argc, char *argv[])
     fclose(arquivo);
 
     return 0;
+}
+
+char *mudar_extensao_para_obj(const char *caminho_original) {
+    char *ponto;
+    char *caminho_temp = strdup(caminho_original); 
+
+    if (caminho_temp == NULL) {
+        perror("Erro ao alocar memória para caminho_temp");
+        return NULL;
+    }
+
+    // Encontrar a última ocorrência de '.'
+    ponto = strrchr(caminho_temp, '.');
+
+    if (ponto) {
+        *ponto = '\0';
+    }
+
+    size_t novo_tamanho = strlen(caminho_temp) + strlen(".obj") + 1;
+
+    char *novo_caminho = (char*)malloc(novo_tamanho);
+    if (novo_caminho == NULL) {
+        perror("Erro ao alocar memória para novo_caminho");
+        free(caminho_temp); 
+        return NULL;
+    }
+
+    sprintf(novo_caminho, "%s%s", caminho_temp, ".obj");
+
+    free(caminho_temp);
+
+    return novo_caminho;
 }
 
 // Funcoes Desenvolvidas ====================================================================================================
@@ -353,10 +408,14 @@ void Analisador_sintatico(Token T){
             push(pilha, T.lexema, 1, 1, -1);
             T = Analisador_Lexico(T);
             if(strcmp(T.simbolo, "sponto_virgula")== 0){
+                Gera_Codigo(" ", "START", " ", " ");
+                Gera_Codigo(" ", "ALLOC", "0", "1");
                 T = Analisa_bloco(T);
                 if(strcmp(T.simbolo, "sponto")== 0){
                     T = Analisador_Lexico(T);
                     if(T.caracter == EOF){
+                        Gera_Codigo(" ", "DALLOC", "0", "1");
+                        Gera_Codigo(" ", "HLT", " ", " ");
                         printf("Termino de programa\n");
                     } else {
                         printf("[%d] Erro ao terminar programa\n", linha);
@@ -395,18 +454,38 @@ Token Analisa_bloco(Token T){
 
     if (strcmp(T.simbolo, "svar") == 0){
         T = Analisa_et_variavel(T);
+    } else {
+        push(pilha_counter, "0", 0, 0, 0);
     }
+
     if ((strcmp(T.simbolo, "sprocedimento") == 0) || (strcmp(T.simbolo, "sfuncao") == 0)){
         T = Analisa_subrotinas(T);
     }
-    if (strcmp(T.simbolo, "sinicio") == 0){
-        T = Analisa_comandos(T);
+
+    T = Analisa_comandos(T);
+    char *dalloc_cmp = pop_op(pilha_counter);
+    if (dalloc_cmp == NULL) dalloc_cmp = "0";
+
+    int tipo_aux = Pesquisa_primeira_marca_tabela();
+    if (tipo_aux == 5 || tipo_aux == 6){
+        Gera_Codigo(" ", "STR", "0", " ");
     }
+    
+    if (strcmp(dalloc_cmp, "0") != 0 && dalloc_cmp[0] != '\0') {
+        end = end - atoi(dalloc_cmp);
+        sprintf(end_str, "%d", end);
+        Gera_Codigo(" ", "DALLOC", end_str, dalloc_cmp);
+    
+    } 
+    
     return T;
 }
 
 
 Token Analisa_et_variavel(Token T){
+    int end_var;
+
+    end_var = end;
     if(strcmp(T.simbolo, "svar")== 0){
         T = Analisador_Lexico(T);
         if(strcmp(T.simbolo, "sidentificador")== 0){
@@ -421,17 +500,23 @@ Token Analisa_et_variavel(Token T){
         } else {
             printf("[%d] Erro ao declarar variavel \n", linha);
         }
+
+        // alterado
+        sprintf(end_str, "%d", end_var);
+        sprintf(counter_str, "%d", counter);
+        Gera_Codigo(" ", "ALLOC", end_str, counter_str);
+        push(pilha_counter, counter_str, 0, 0, 0);
+        counter = 0;
     }
     return T;
 }
 
 Token Analisa_variaveis(Token T){
-    int counter = 0;
     do{
         if(strcmp(T.simbolo, "sidentificador") == 0){
             if (Pesquisa_duplicvar_tabela(T.lexema) == 0){
-                end++;
                 push(pilha, T.lexema, 0, 0, end);
+                end ++;
                 counter++;
                 T = Analisador_Lexico(T);
                 if((strcmp(T.simbolo, "svirgula")== 0) || (strcmp(T.simbolo, "sdoispontos")== 0)){
@@ -455,9 +540,10 @@ Token Analisa_variaveis(Token T){
     if(strcmp(T.simbolo, "sdoispontos") != 0){
         printf("[%d] Erro: falta ':' na declaracao de variavel\n", linha);
     }
+
     T = Analisador_Lexico(T);
     T = Analisa_Tipo(T);
-    counter = 0;
+
     return T;
 }
 
@@ -472,6 +558,13 @@ Token Analisa_Tipo(Token T){
 }
 
 Token Analisa_subrotinas(Token T){
+    int auxrot;
+
+    auxrot = rotulo;
+    sprintf(rotulo_str, "%c%d", c, auxrot);
+    Gera_Codigo(" ", "JMP", rotulo_str, " ");
+    rotulo++;
+
     while(strcmp(T.simbolo, "sprocedimento")== 0 || strcmp(T.simbolo, "sfuncao")== 0) {
        if(strcmp(T.simbolo, "sprocedimento")== 0){
         T = Analisa_declaracao_procedimento(T);
@@ -485,6 +578,10 @@ Token Analisa_subrotinas(Token T){
             printf("[%d] Erro: falta ; apos a declaracao da subrotina \n", linha);
        }
     }
+
+    sprintf(rotulo_str, "%c%d", c, auxrot);
+    Gera_Codigo(rotulo_str, "NULL", " ", " ");
+
     return T;
 }
 
@@ -493,6 +590,9 @@ Token Analisa_declaracao_procedimento(Token T){
     if(strcmp(T.simbolo, "sidentificador")== 0){
         if (Pesquisa_declproc_tabela(T.lexema) == 0){
             push(pilha, T.lexema, 1, 4, rotulo);
+
+            sprintf(rotulo_str, "%c%d", c, rotulo);
+            Gera_Codigo(rotulo_str, "NULL", " ", " ");
             rotulo++;
             T = Analisador_Lexico(T);
             if(strcmp(T.simbolo, "sponto_virgula")== 0){
@@ -506,7 +606,10 @@ Token Analisa_declaracao_procedimento(Token T){
     } else {
         printf("[%d] Erro ao identificar a declaracao do procedimento \n", linha);
     }
+
+    Gera_Codigo(" ", "RETURN", " ", " ");
     Desempilha_volta_nivel(pilha);
+
     return T;
 }
 
@@ -515,6 +618,8 @@ Token Analisa_declaracao_funcao(Token T){
     if(strcmp(T.simbolo, "sidentificador")== 0){
         if(Pesquisa_declfunc_tabela(T.lexema) == 0){
             push(pilha, T.lexema, 1, 0, rotulo);
+            sprintf(rotulo_str, "%c%d", c, rotulo);
+            Gera_Codigo(rotulo_str, "NULL", " ", " ");
             rotulo++;
             T = Analisador_Lexico(T);
             if(strcmp(T.simbolo, "sdoispontos")== 0){
@@ -546,6 +651,7 @@ Token Analisa_declaracao_funcao(Token T){
     } else {
         printf("[%d] Erro ao identificar a declaracao da funcao \n", linha);
     }
+    Gera_Codigo(" ", "RETURN", " ", " ");
     Desempilha_volta_nivel(pilha);
     return T;
 }
@@ -581,9 +687,6 @@ Token Analisa_comandos(Token T) {
 
 Token Analisa_comando_simples(Token T){
     if(strcmp(T.simbolo, "sidentificador")==0){
-        if(Pesquisa_duplicvar_tabela(T.lexema) == 0){
-            printf("[%d] Erro: variavel '%s' nao declarada anteriormente\n", linha, T.lexema);
-        }
         T = Analisa_atrib_chprocedimento(T);
     } else if(strcmp(T.simbolo, "sse")==0){
         T = Analisa_se(T);
@@ -604,8 +707,15 @@ Token Analisa_comando_simples(Token T){
 Token Analisa_atrib_chprocedimento(Token T){
     Token T1 = Analisador_Lexico(T);
     if(strcmp(T1.simbolo, "satribuicao")== 0){
+        if(Pesquisa_declfuncao_existe_tabela(T.lexema) == -1 && Pesquisa_declvar_tabela(T.lexema) == -1){
+            printf("[%d] Erro: variavel '%s' nao declarada anteriormente\n", linha, T.lexema);
+        }
         T = Analisa_comando_atribuicao(T1, T);
+
     } else {
+        if(Pesquisa_champroc_tabela(T.lexema) == -1){
+            printf("[%d] Erro: procedimento '%s' nao declarado anteriormente\n", linha, T.lexema);
+        }
         T = Analisa_chamada_procedimento(T);
     }
     return T;
@@ -628,16 +738,22 @@ Token Analisa_comando_atribuicao(Token T, Token T_var){
     if(strcmp(Pesquisa_Tipo(T_var.lexema), tipo_posfixa) != 0){
         printf("[%d] Erro: tipo da expressao diferente do tipo da variavel na atribuicao \n", linha);
     }
-    // print do posfixa
-    // for (int i = 0; i < conta_string; i++) {
-    //     printf("%s ", posfixa[i]);
-    // }
+    // alterado
+    int end_retorno = Pesquisa_declvar_tabela(T_var.lexema);
+    if(end_retorno != -1){
+        sprintf(end_str, "%d", end_retorno);
+        Gera_Codigo(" ", "STR", end_str, " ");
+    }
+
     return T;
 }
 
 Token Analisa_chamada_procedimento(Token T){
     if(strcmp(T.simbolo, "sidentificador")== 0){
-        if (Pesquisa_champroc_tabela(T.lexema) == 1){
+        int end_retorno = Pesquisa_champroc_tabela(T.lexema);
+        if (end_retorno != -1){
+            sprintf(end_str, "%c%d", c, end_retorno);
+            Gera_Codigo(" ", "CALL", end_str, " ");
             T = Analisador_Lexico(T);
         } else {
             printf("[%d] Erro: procedimento '%s' nao declarado anteriormente \n", linha, T.lexema);
@@ -651,6 +767,8 @@ Token Analisa_chamada_procedimento(Token T){
 Token Analisa_se(Token T){
     char *op;
     char *tipo_posfixa;
+    int auxrot1, auxrot2;
+
     T = Analisador_Lexico(T);
     T = Analisa_expressao(T);
 
@@ -666,11 +784,31 @@ Token Analisa_se(Token T){
     }
 
     if(strcmp(T.simbolo, "sentao")== 0){
+        auxrot1 = rotulo;
+        sprintf(rotulo_str, "%c%d", c, auxrot1);
+        Gera_Codigo(" ", "JMPF", rotulo_str, " ");
+        rotulo++;
+
         T = Analisador_Lexico(T);
         T = Analisa_comando_simples(T);
+
         if(strcmp(T.simbolo, "ssenao")== 0){
+            auxrot2 = rotulo;
+            sprintf(rotulo_str, "%c%d", c, auxrot2);
+            Gera_Codigo(" ", "JMP", rotulo_str, " ");
+            rotulo++;
+            sprintf(rotulo_str, "%c%d", c, auxrot1);
+            Gera_Codigo(rotulo_str, "NULL", " ", " ");
+
             T = Analisador_Lexico(T);
             T = Analisa_comando_simples(T);
+
+            sprintf(rotulo_str, "%c%d", c, auxrot2);
+            Gera_Codigo(rotulo_str, "NULL", " ", " ");
+
+        } else {    
+            sprintf(rotulo_str, "%c%d", c, auxrot1);
+            Gera_Codigo(rotulo_str, "NULL", " ", " ");
         }
     } else {
         printf("[%d] Erro sintatico do comando SE (ausencia do ENTAO) \n", linha);
@@ -681,6 +819,13 @@ Token Analisa_se(Token T){
 Token Analisa_enquanto(Token T){
     char *op;
     char *tipo_posfixa;
+    int auxrot1, auxrot2;
+
+    auxrot1 = rotulo;
+    sprintf(rotulo_str, "%c%d", c, auxrot1);
+    Gera_Codigo(rotulo_str, "NULL", " ", " ");
+    rotulo++;
+
     T = Analisador_Lexico(T);
     T = Analisa_expressao(T);
 
@@ -697,8 +842,19 @@ Token Analisa_enquanto(Token T){
     }
 
     if(strcmp(T.simbolo, "sfaca")== 0){
+        auxrot2 = rotulo;
+        sprintf(rotulo_str, "%c%d", c, auxrot2);
+        Gera_Codigo(" ", "JMPF", rotulo_str, " ");
+        rotulo++;
+
         T = Analisador_Lexico(T);
         T = Analisa_comando_simples(T);
+
+        sprintf(rotulo_str, "%c%d", c, auxrot1);
+        Gera_Codigo(" ", "JMP", rotulo_str, " ");
+        sprintf(rotulo_str, "%c%d", c, auxrot2);
+        Gera_Codigo(rotulo_str, "NULL", " ", " ");
+
     } else {
         printf("[%d] Erro sintatico do comando ENQUANTO (ausencia do FACA) \n", linha);
     }
@@ -710,13 +866,22 @@ Token Analisa_leia(Token T){
     if(strcmp(T.simbolo, "sabre_parenteses") == 0){
         T = Analisador_Lexico(T);
         if (strcmp(T.simbolo, "sidentificador") == 0){
-            if(Pesquisa_declvar_tabela(T.lexema) == 1){
+            int end_retorno = Pesquisa_declvar_tabela(T.lexema);
+            if(end_retorno != -1){
+                Gera_Codigo(" ", "RD", " ", " ");
+                sprintf(end_str, "%d", end_retorno);
+                Gera_Codigo(" ", "STR", end_str, " ");
+
+                char *tipo = Pesquisa_Tipo(T.lexema);
+                if(strcmp(tipo, "#") != 0){
+                    printf("[%d] Erro: tipo da variavel '%s' diferente do tipo esperado na funcao LEIA \n", linha, T.lexema);
+                }
                 T = Analisador_Lexico(T);
                 if (strcmp(T.simbolo, "sfecha_parenteses")==0){
                     T = Analisador_Lexico(T);
                 } else {
                     printf("[%d] Erro: ausencia de ')' no final do comando LEIA \n", linha);
-                }
+                }  
             }else{
                 printf("[%d] Erro: variavel '%s' nao declarada anteriormente\n", linha, T.lexema);
             }
@@ -734,10 +899,26 @@ Token Analisa_escreva(Token T){
     if(strcmp(T.simbolo, "sabre_parenteses")== 0){
         T = Analisador_Lexico(T);
         if(strcmp(T.simbolo, "sidentificador")== 0){
-            if(Pesquisa_declvarfunc_tabela(T.lexema) == 1){
+            int end_retorno = Pesquisa_declfuncao_existe_tabela(T.lexema);
+            if(Pesquisa_declfuncao_existe_tabela(T.lexema) != -1){
+                sprintf(end_str, "%d", end_retorno);
+                Gera_Codigo(" ", "CALL", end_str, " ");
+                Gera_Codigo(" ", "LDV", "0", " ");
+                Gera_Codigo(" ", "PRN", " ", " ");
+            } 
+            else if(Pesquisa_declvar_tabela(T.lexema) != -1){
+                end_retorno = Pesquisa_declvar_tabela(T.lexema);
+                sprintf(end_str, "%d", end_retorno);
+                Gera_Codigo(" ", "LDV", end_str, " ");
+                Gera_Codigo(" ", "PRN", " ", " ");
+                
+                char *tipo = Pesquisa_Tipo(T.lexema);
+                if(strcmp(tipo, "#") != 0){
+                    printf("[%d] Erro: tipo da variavel '%s' diferente do tipo esperado no comando escreva \n", linha, T.lexema);
+                }
                 T = Analisador_Lexico(T);
                 if(strcmp(T.simbolo, "sfecha_parenteses")== 0){
-                T = Analisador_Lexico(T);
+                    T = Analisador_Lexico(T);
                 } else {
                     printf("[%d] Erro: ausencia de ')' no final do comando ESCREVA \n", linha);
                 }
@@ -802,8 +983,8 @@ Token Analisa_termo(Token T){
 
 Token Analisa_fator(Token T){
     if(strcmp(T.simbolo, "sidentificador")== 0){
-        if(Pesquisa_declvar_tabela(T.lexema) == 1 || Pesquisa_declfunc_tabela(T.lexema) == 1){
-            if(Pesquisa_declfunc_tabela(T.lexema) == 1){
+        if(Pesquisa_declvar_tabela(T.lexema) != -1 || Pesquisa_declfuncao_existe_tabela(T.lexema) != -1){
+            if(Pesquisa_declfuncao_existe_tabela(T.lexema) != -1){
                 T = Analisa_chamada_funcao(T);
             }else{
                 Converte_posfixa(T);
@@ -845,7 +1026,8 @@ Token Analisa_fator(Token T){
 
 Token Analisa_chamada_funcao(Token T){
     if(strcmp(T.simbolo, "sidentificador")== 0){
-        if(Pesquisa_chamfuncao_tabela(T.lexema) == 1){
+        int end_retorno = Pesquisa_chamfuncao_tabela(T.lexema);
+        if (end_retorno != -1){
             Converte_posfixa(T);
             T = Analisador_Lexico(T);
         } else {
@@ -873,6 +1055,7 @@ void Converte_posfixa(Token T){
             if(strcmp(T.simbolo, "sabre_parenteses")!= 0){
                 while(!vaziaPilha(pilha_op) && (Precedencia_topo(pilha_op) >= Precedencia_atual(T)) && (Precedencia_topo(pilha_op) != 8)){
                         op = pop_op(pilha_op);
+                        if (op == NULL) break;
                         strcpy(posfixa[conta_string], op);
                         conta_string++;
                 }
@@ -905,7 +1088,6 @@ void Converte_posfixa(Token T){
         strcpy(posfixa[conta_string], T.lexema);
         conta_string++;
     }
-
 }
 
 int Precedencia_topo(Pilha *p){
@@ -960,7 +1142,6 @@ int Precedencia_atual(Token T){
             return 1;
         }
     }
-
 }
 
 char *Verifica_Tipo_Posfixa(){
@@ -970,105 +1151,280 @@ char *Verifica_Tipo_Posfixa(){
     Pilha* p_tipo = CriaPilha();
     char *op;
     char *op2;
+    char *op_tipo;
+    char *op2_tipo;
 
-    for(int i=0; i<conta_string; i++){
+    if (conta_string == 1){
+        op = posfixa[0];
+        op_tipo = Pesquisa_Tipo(op);
 
-        if(strcmp(posfixa[i], "+") == 0 || strcmp(posfixa[i], "-") == 0 ||
-           strcmp(posfixa[i], "*") == 0 || strcmp(posfixa[i], "div") == 0){
+        if(isdigit(op[0])){
+            Gera_Codigo(" ", "LDC", op, " ");
+        }
+        else if(strcmp(op, "verdadeiro") == 0){
+            Gera_Codigo(" ", "LDC", "1", " ");
+        }
+        else if(strcmp(op, "falso") == 0){
+            Gera_Codigo(" ", "LDC", "0", " ");
+        }
+        else if(Pesquisa_declvar_tabela(op)!= -1){
+            int end_retorno = Pesquisa_declvar_tabela(op);
+            sprintf(end_str, "%d", end_retorno);
+            Gera_Codigo(" ", "LDV", end_str, " ");
+        }
+        else if(Pesquisa_declfuncao_existe_tabela(op)!= -1){
+            int end_retorno = Pesquisa_declfuncao_existe_tabela(op);
+            sprintf(end_str, "%c%d", c, end_retorno);
+            Gera_Codigo(" ", "CALL", end_str, " ");
+            Gera_Codigo(" ", "LDV", "0", " ");
+        }
+        
+        conta_string = 0;
+        memset(posfixa, 0, sizeof(posfixa));
+        return op_tipo;
 
-            op = pop_op(p_tipo);
-            op2 = pop_op(p_tipo);
-            op = Pesquisa_Tipo(op);
-            op2 = Pesquisa_Tipo(op2);
+    } else{
+        for(int i=0; i<conta_string; i++){
 
-            if(strcmp(op, "#") == 0 && strcmp(op2, "#") == 0){
-                push(p_tipo, "#", -1, -1, -1);
+            if(strcmp(posfixa[i], "+") == 0 || strcmp(posfixa[i], "-") == 0 ||
+            strcmp(posfixa[i], "*") == 0 || strcmp(posfixa[i], "div") == 0){
+
+                op = pop_op(p_tipo);
+                op2 = pop_op(p_tipo);
+                op_tipo = Pesquisa_Tipo(op);
+                op2_tipo = Pesquisa_Tipo(op2);
+
+                // verifica op2
+                if(isdigit(op2[0])){
+                    Gera_Codigo(" ", "LDC", op2, " ");
+                }
+                else if(Pesquisa_declvar_tabela(op2)!= -1){
+                    int end_retorno = Pesquisa_declvar_tabela(op2);
+                    sprintf(end_str, "%d", end_retorno);
+                    Gera_Codigo(" ", "LDV", end_str, " ");
+                }
+                else if(Pesquisa_declfuncao_existe_tabela(op2)!= -1){
+                    int end_retorno = Pesquisa_declfuncao_existe_tabela(op2);
+                    sprintf(end_str, "%c%d", c, end_retorno);
+                    Gera_Codigo(" ", "CALL", end_str, " ");
+                    Gera_Codigo(" ", "LDV", "0", " ");
+                }
+
+                // Verifica op
+                if(isdigit(op[0])){
+                    Gera_Codigo(" ", "LDC", op, " ");
+                }
+                else if(Pesquisa_declvar_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declvar_tabela(op);
+                    sprintf(end_str, "%d", end_retorno);
+                    Gera_Codigo(" ", "LDV", end_str, " ");
+                }
+                else if(Pesquisa_declfuncao_existe_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declfuncao_existe_tabela(op);
+                    sprintf(end_str, "%c%d", c, end_retorno);
+                    Gera_Codigo(" ", "CALL", end_str, " ");
+                    Gera_Codigo(" ", "LDV", "0", " ");
+                }
+                
+                if(strcmp(op_tipo, "#") == 0 && strcmp(op2_tipo, "#") == 0){
+                    push(p_tipo, "#", -1, -1, -1);
+                    //verifica tipos
+                    if(strcmp(posfixa[i], "+") == 0){
+                        Gera_Codigo(" ", "ADD", " ", " ");
+                    } else if(strcmp(posfixa[i], "-") == 0){
+                        Gera_Codigo(" ", "SUB", " ", " ");
+                    } else if(strcmp(posfixa[i], "*") == 0){
+                        Gera_Codigo(" ", "MULT", " ", " ");
+                    } else if(strcmp(posfixa[i], "div") == 0){
+                        Gera_Codigo(" ", "DIV", " ", " ");
+                    }
+                } else {
+                    printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
+                    return "0";
+                }
+
+            }else if (strcmp(posfixa[i], ">") == 0 || strcmp(posfixa[i], "<") == 0 ||
+                    strcmp(posfixa[i], ">=") == 0 || strcmp(posfixa[i], "<=") == 0 ||
+                    strcmp(posfixa[i], "=") == 0 || strcmp(posfixa[i], "!=") == 0){
+
+                op = pop_op(p_tipo);
+                op2 = pop_op(p_tipo);
+                op_tipo = Pesquisa_Tipo(op);
+                op2_tipo = Pesquisa_Tipo(op2);
+
+                // verifica op2
+                if(isdigit(op2[0])){
+                    Gera_Codigo(" ", "LDC", op2, " ");
+                }
+                else if(Pesquisa_declvar_tabela(op2)!= -1){
+                    int end_retorno = Pesquisa_declvar_tabela(op2);
+                    sprintf(end_str, "%d", end_retorno);
+                    Gera_Codigo(" ", "LDV", end_str, " ");
+                }
+                else if(Pesquisa_declfuncao_existe_tabela(op2)!= -1){
+                    int end_retorno = Pesquisa_declfuncao_existe_tabela(op2);
+                    sprintf(end_str, "%c%d", c, end_retorno);
+                    Gera_Codigo(" ", "CALL", end_str, " ");
+                    Gera_Codigo(" ", "LDV", "0", " ");
+                }
+                // Verifica op
+                if(isdigit(op[0])){
+                    Gera_Codigo(" ", "LDC", op, " ");
+                }
+                else if(Pesquisa_declvar_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declvar_tabela(op);
+                    sprintf(end_str, "%d", end_retorno);
+                    Gera_Codigo(" ", "LDV", end_str, " ");
+                }
+                else if(Pesquisa_declfuncao_existe_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declfuncao_existe_tabela(op);
+                    sprintf(end_str, "%c%d", c, end_retorno);
+                    Gera_Codigo(" ", "CALL", end_str, " ");
+                    Gera_Codigo(" ", "LDV", "0", " ");
+                }
+
+                if(strcmp(op_tipo, "#") == 0 && strcmp(op2_tipo, "#") == 0){
+                    push(p_tipo, "/", -1, -1, -1);
+                    //verifica tipos
+                    if(strcmp(posfixa[i], ">") == 0){
+                        Gera_Codigo(" ", "CMA", " ", " ");
+                    } else if(strcmp(posfixa[i], "<") == 0){
+                        Gera_Codigo(" ", "CME", " ", " ");
+                    } else if(strcmp(posfixa[i], ">=") == 0){
+                        Gera_Codigo(" ", "CMAQ", " ", " ");
+                    } else if(strcmp(posfixa[i], "<=") == 0){
+                        Gera_Codigo(" ", "CMEQ", " ", " ");
+                    } else if(strcmp(posfixa[i], "=") == 0){
+                        Gera_Codigo(" ", "CEQ", " ", " ");
+                    } else if(strcmp(posfixa[i], "!=") == 0){
+                        Gera_Codigo(" ", "CDIF", " ", " ");
+                    }
+
+                } else {
+                    printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
+                    return "0";
+                }
+
+            } else if(strcmp(posfixa[i], "@") == 0 || strcmp(posfixa[i], "$") == 0){
+
+                op = pop_op(p_tipo);
+                op_tipo = Pesquisa_Tipo(op);
+
+                // Verifica op
+                if(isdigit(op[0])){
+                    Gera_Codigo(" ", "LDC", op, " ");
+                }
+                else if(Pesquisa_declvar_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declvar_tabela(op);
+                    sprintf(end_str, "%d", end_retorno);
+                    Gera_Codigo(" ", "LDV", end_str, " ");
+                }
+                else if(Pesquisa_declfuncao_existe_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declfuncao_existe_tabela(op);
+                    sprintf(end_str, "%c%d", c, end_retorno);
+                    Gera_Codigo(" ", "CALL", end_str, " ");
+                    Gera_Codigo(" ", "LDV", "0", " ");
+                }
+
+                //verifica tipos
+                if(strcmp(posfixa[i], "$") == 0){
+                    Gera_Codigo(" ", "INV", " ", " ");
+                }
+
+                if(strcmp(op_tipo, "#") == 0){
+                    push(p_tipo, "#", -1, -1, -1);
+
+                } else {
+                    printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
+                    return "0";
+                }
+
+            } else if(strcmp(posfixa[i], "e") == 0 || strcmp(posfixa[i], "ou") == 0){
+
+                op = pop_op(p_tipo);
+                op2 = pop_op(p_tipo);
+                op_tipo = Pesquisa_Tipo(op);
+                op2_tipo = Pesquisa_Tipo(op2);
+            
+                // verifica op2
+                if(Pesquisa_declvar_tabela(op2)!= -1){
+                    int end_retorno = Pesquisa_declvar_tabela(op2);
+                    sprintf(end_str, "%d", end_retorno);
+                    Gera_Codigo(" ", "LDV", end_str, " ");
+
+                }
+                else if(Pesquisa_declfuncao_existe_tabela(op2)!= -1){
+                    int end_retorno = Pesquisa_declfuncao_existe_tabela(op2);
+                    sprintf(end_str, "%c%d", c, end_retorno);
+                    Gera_Codigo(" ", "CALL", end_str, " ");
+                    Gera_Codigo(" ", "LDV", "0", " ");
+                }
+
+                // Verifica op
+                if(Pesquisa_declvar_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declvar_tabela(op);
+                    sprintf(end_str, "%d", end_retorno);
+                    Gera_Codigo(" ", "LDV", end_str, " ");
+                    
+                }    
+                else if(Pesquisa_declfuncao_existe_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declfuncao_existe_tabela(op);
+                    sprintf(end_str, "%c%d", c, end_retorno);
+                    Gera_Codigo(" ", "CALL", end_str, " ");
+                    Gera_Codigo(" ", "LDV", "0", " ");
+                }
+                
+
+                if(strcmp(op_tipo, "/") == 0 && strcmp(op2_tipo, "/") == 0){
+                    push(p_tipo, "/", -1, -1, -1);
+                    //verifica tipos
+                    if(strcmp(posfixa[i], "e") == 0){
+                        Gera_Codigo(" ", "AND", " ", " ");
+                    } else if(strcmp(posfixa[i], "ou") == 0){
+                        Gera_Codigo(" ", "OR", " ", " ");
+                    }
+                } else {
+                    printf("[%d] Erro: operacao logica com tipos invalidos \n", linha);
+                    return "0";
+                }
+
+            } else if(strcmp(posfixa[i], "nao") == 0){
+
+                op = pop_op(p_tipo);
+                op_tipo = Pesquisa_Tipo(op);
+
+                // Verifica op
+                if(Pesquisa_declvar_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declvar_tabela(op);
+                    sprintf(end_str, "%d", end_retorno);
+                    Gera_Codigo(" ", "LDV", end_str, " ");
+                }
+                else if(Pesquisa_declfuncao_existe_tabela(op)!= -1){
+                    int end_retorno = Pesquisa_declfuncao_existe_tabela(op);
+                    sprintf(end_str, "%c%d", c, end_retorno);
+                    Gera_Codigo(" ", "CALL", end_str, " ");
+                    Gera_Codigo(" ", "LDV", "0", " ");
+                }
+
+                if(strcmp(op_tipo, "/") == 0){
+                    push(p_tipo, "/", -1, -1, -1);
+                    //verifica tipos
+                    Gera_Codigo(" ", "NEG", " ", " ");
+                } else {
+                    printf("[%d] Erro: operacao logica com tipos invalidos \n", linha);
+                    return "0";
+                }
+
             } else {
-                printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
-                return "0";
+                push(p_tipo, posfixa[i], -1, -1, -1);
             }
-
-        }else if (strcmp(posfixa[i], ">") == 0 || strcmp(posfixa[i], "<") == 0 ||
-                  strcmp(posfixa[i], ">=") == 0 || strcmp(posfixa[i], "<=") == 0){
-
-            op = pop_op(p_tipo);
-            op2 = pop_op(p_tipo);
-            op = Pesquisa_Tipo(op);
-            op2 = Pesquisa_Tipo(op2);
-
-            if(strcmp(op, "#") == 0 && strcmp(op2, "#") == 0){
-                push(p_tipo, "/", -1, -1, -1);
-
-            } else {
-                printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
-                return "0";
-            }
-
-        } else if(strcmp(posfixa[i], "=") == 0 || strcmp(posfixa[i], "!=") == 0){
-
-            op = pop_op(p_tipo);
-            op2 = pop_op(p_tipo);
-            op = Pesquisa_Tipo(op);
-            op2 = Pesquisa_Tipo(op2);
-
-            if(strcmp(op, "#") == 0 && strcmp(op2, "#") == 0){
-                push(p_tipo, "/", -1, -1, -1);
-
-            } else if(strcmp(op, "/") == 0 && strcmp(op2, "/") == 0){
-                push(p_tipo, "/", -1, -1, -1);
-
-            } else {
-                printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
-                return "0";
-            }
-
-        } else if(strcmp(posfixa[i], "@") == 0 || strcmp(posfixa[i], "$") == 0){
-
-            op = pop_op(p_tipo);
-            op = Pesquisa_Tipo(op);
-
-            if(strcmp(op, "#") == 0){
-                push(p_tipo, "#", -1, -1, -1);
-
-            } else {
-                printf("[%d] Erro: operacao aritmetica com tipos invalidos \n", linha);
-                return "0";
-            }
-
-        } else if(strcmp(posfixa[i], "e") == 0 || strcmp(posfixa[i], "ou") == 0){
-
-            op = pop_op(p_tipo);
-            op2 = pop_op(p_tipo);
-            op = Pesquisa_Tipo(op);
-            op2 = Pesquisa_Tipo(op2);
-
-            if(strcmp(op, "/") == 0 && strcmp(op2, "/") == 0){
-                push(p_tipo, "/", -1, -1, -1);
-            } else {
-                printf("[%d] Erro: operacao logica com tipos invalidos \n", linha);
-                return "0";
-            }
-
-        } else if(strcmp(posfixa[i], "nao") == 0){
-
-            op = pop_op(p_tipo);
-            op = Pesquisa_Tipo(op);
-
-            if(strcmp(op, "/") == 0){
-                push(p_tipo, "/", -1, -1, -1);
-            } else {
-                printf("[%d] Erro: operacao logica com tipos invalidos \n", linha);
-                return "0";
-            }
-
-        } else {
-            push(p_tipo, posfixa[i], -1, -1, -1);
         }
     }
 
     op = pop_op(p_tipo);
+    conta_string = 0;
+    memset(posfixa, 0, sizeof(posfixa));
     return op;
-
 }
 
 char *Pesquisa_Tipo(char* simbolo){
@@ -1078,6 +1434,12 @@ char *Pesquisa_Tipo(char* simbolo){
         return "#"; // inteiro
     }
     else if (strcmp(simbolo, "verdadeiro") == 0 || strcmp(simbolo, "falso") == 0){
+        return "/"; // booleano
+    } 
+    else if(strcmp(simbolo, "#") == 0){
+        return "#"; // inteiro
+    } 
+    else if(strcmp(simbolo, "/") == 0){
         return "/"; // booleano
     }
     else{
@@ -1091,6 +1453,7 @@ char *Pesquisa_Tipo(char* simbolo){
             }
             q = q->prox;
         }
+        return "0"; // invalido
     }
 }
 
@@ -1121,17 +1484,17 @@ void Pesquisa_tipo_tabela(char* simbolo){
 int Pesquisa_declvar_tabela(char* nome_variavel){
     // Verifica se a variavel ja foi declarada
     if(consulta_primeira_ocorrencia_variavel(pilha, nome_variavel) != NULL){
-        return 1;
+        return consulta_primeira_ocorrencia_variavel(pilha, nome_variavel)->memoria;
     }
-    return 0;
+    return -1;
 }
 
-int Pesquisa_declvarfunc_tabela(char* nome_variavel){
+int Pesquisa_declfuncao_existe_tabela(char* nome_variavel){
     // Verifica se a variavel ja foi declarada
-    if(consulta_primeira_ocorrencia_funcao_e_variavel(pilha, nome_variavel) != NULL){
-        return 1;
+    if(consulta_primeira_ocorrencia_funcao_existe(pilha, nome_variavel) != NULL){
+        return consulta_primeira_ocorrencia_funcao_existe(pilha, nome_variavel)->memoria;
     }
-    return 0;
+    return -1;
 }
 
 int Pesquisa_declproc_tabela(char* nome_procedimento){
@@ -1153,17 +1516,24 @@ int Pesquisa_declfunc_tabela(char* nome_funcao){
 int Pesquisa_champroc_tabela(char* nome_procedimento){
     // Verifica se a funcao ja foi declarada
     if(consulta_primeira_ocorrencia_procedimento(pilha, nome_procedimento) != NULL){
-        return 1;
+        return consulta_primeira_ocorrencia_procedimento(pilha, nome_procedimento)->memoria;
     }
-    return 0;
+    return -1;
 }
 
 int Pesquisa_chamfuncao_tabela(char* nome_funcao){
     // Verifica se a funcao ja foi declarada
     if(consulta_primeira_ocorrencia_funcao(pilha, nome_funcao) != NULL){
-        return 1;
+        return consulta_primeira_ocorrencia_funcao(pilha, nome_funcao)->memoria;
     }
-    return 0;
+    return -1;
+}
+
+int Pesquisa_primeira_marca_tabela(){
+    if(consulta_escopo(pilha) != NULL){
+        return consulta_escopo(pilha)->tipo; 
+    }
+    return -1; 
 }
 
 void Desempilha_volta_nivel(Pilha* p){
@@ -1176,3 +1546,19 @@ void Desempilha_volta_nivel(Pilha* p){
         q->escopo = 0;
     }
 }
+
+// Gera Codigo =======================================================================================================
+
+void Gera_Codigo(char *rot, char *comando, char *tipo1, char *tipo2){
+
+    arquivo_obj = fopen(nome_arquivo, "a");
+    if (arquivo_obj == NULL) {
+        perror("Erro ao criar arquivo OBJ");
+    }
+    
+    fprintf(arquivo_obj, "%-4s %-8s %-4s %-4s\n", rot, comando, tipo1, tipo2);
+
+    fclose(arquivo_obj);
+    
+}
+

@@ -179,6 +179,24 @@ No *consulta_variavel_escopo(Pilha *p, const char *nome_variavel)
     return NULL;
 }
 
+No *consulta_escopo(Pilha *p)
+{
+    if (p == NULL || p->Topo == NULL) {
+        /* Pilha vazia */
+        return NULL;
+    }
+
+    No *q = p->Topo;
+    /* testar q != NULL antes de acessar q->escopo */
+    while (q != NULL && q->escopo == 0) {
+        q = q->prox;
+    }
+   if (q->escopo == 1)
+      return q;
+      
+    return NULL;
+}
+
 /* procura a primeira ocorrencia de variavel (tipo 2 ou 3) */
 No *consulta_primeira_ocorrencia_variavel(Pilha *p, const char *nome_variavel)
 {
@@ -195,8 +213,8 @@ No *consulta_primeira_ocorrencia_variavel(Pilha *p, const char *nome_variavel)
     return NULL;
 }
 
-/* procura funcao ou variavel (tipos 2,3,5,6) */
-No *consulta_primeira_ocorrencia_funcao_e_variavel(Pilha *p, const char *nome)
+/* procura funcao ou variavel (tipos 5,6) */
+No *consulta_primeira_ocorrencia_funcao_existe(Pilha *p, const char *nome)
 {
     if (p == NULL || p->Topo == NULL) {
         return NULL;
@@ -204,7 +222,7 @@ No *consulta_primeira_ocorrencia_funcao_e_variavel(Pilha *p, const char *nome)
 
     No *q = p->Topo;
     while (q != NULL) {
-        if ((strcmp(q->lexema, nome) == 0) && (q->tipo == 2 || q->tipo == 3 || q->tipo == 5 || q->tipo == 6))
+        if ((strcmp(q->lexema, nome) == 0) && (q->tipo == 5 || q->tipo == 6))
             return q;
         q = q->prox;
     }
