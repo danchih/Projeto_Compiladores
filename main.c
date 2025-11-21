@@ -17,7 +17,7 @@ char posfixa[250][100];
 int conta_string = 0;
 
 char rotulo_str[5];
-char c = 'L';
+char c = 'X';
 int end = 1;
 char end_str[20];
 char counter_str[20];
@@ -56,7 +56,7 @@ Token Analisa_comandos(Token T);
 Token Analisa_comando_simples(Token T);
 Token Analisa_atrib_chprocedimento(Token T);
 Token Analisa_comando_atribuicao(Token T, Token T_var);
-Token Analisa_chamada_procedimento(Token T);
+Token Analisa_chamada_procedimento(Token T1, Token T);
 Token Analisa_se(Token T);
 Token Analisa_enquanto(Token T);
 Token Analisa_leia(Token T);
@@ -716,7 +716,7 @@ Token Analisa_atrib_chprocedimento(Token T){
         if(Pesquisa_champroc_tabela(T.lexema) == -1){
             printf("[%d] Erro: procedimento '%s' nao declarado anteriormente\n", linha, T.lexema);
         }
-        T = Analisa_chamada_procedimento(T);
+        T = Analisa_chamada_procedimento(T1, T);
     }
     return T;
 }
@@ -748,20 +748,19 @@ Token Analisa_comando_atribuicao(Token T, Token T_var){
     return T;
 }
 
-Token Analisa_chamada_procedimento(Token T){
+Token Analisa_chamada_procedimento(Token T1, Token T){
     if(strcmp(T.simbolo, "sidentificador")== 0){
         int end_retorno = Pesquisa_champroc_tabela(T.lexema);
         if (end_retorno != -1){
             sprintf(end_str, "%c%d", c, end_retorno);
             Gera_Codigo(" ", "CALL", end_str, " ");
-            T = Analisador_Lexico(T);
         } else {
             printf("[%d] Erro: procedimento '%s' nao declarado anteriormente \n", linha, T.lexema);
         }
     } else {
         printf("[%d] Erro ao identificar chamada de procedimento \n", linha);
     }
-    return T;
+    return T1;
 }
 
 Token Analisa_se(Token T){
