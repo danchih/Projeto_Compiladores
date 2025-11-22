@@ -100,7 +100,7 @@ int Pesquisa_chamfuncao_tabela(char* nome_funcao);          // Verifica se a fun
 void Desempilha_volta_nivel(Pilha* p);
 
 // Dicionario da pilha ======================================================================================================s
-// ORDEM:  lexema - escopo - tipo - memoria 
+// Ordem da Tabela:  lexema - escopo - tipo - memoria 
 
 // escopo = 1: procedimento / funcao / programa
 // escopo = 0: nada
