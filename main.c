@@ -4,6 +4,14 @@
 #include <ctype.h>
 #include "pilha.h"
 
+/* 
+Codigo Fonte do Compilador. Contem as etapas:
+- Analisador Lexico
+- Analisador Sintatico
+- Analisador Semantico
+- Geracao de Codigo
+*/
+
 FILE *arquivo;
 FILE *arquivo_obj;
 char *nome_arquivo;
@@ -31,25 +39,27 @@ typedef struct{
 }Token;
 
 // Prototipos das funcoes ==================================================================================================
-// Analisadores Lexicos
-Token trata_digito(Token T);
-Token trata_pontuacao(Token T);
-Token trata_operador_aritmetico(Token T);
-Token trata_operador_relacional(Token T);
-Token trata_atribuicao(Token T);
-Token trata_identificador_palavra(Token T);
-Token Pega_Token(Token T);
-Token Analisador_Lexico(Token T);
-
 char *mudar_extensao_para_obj(const char *caminho_original);
 
-// Analisadores Sintaticos
-void Analisador_sintatico(Token T);
-Token Analisa_bloco(Token T);
-Token Analisa_et_variavel(Token T);
-Token Analisa_variaveis(Token T);
-Token Analisa_Tipo(Token T);
-Token Analisa_subrotinas(Token T);
+// Analisadores Lexicos ====================================================================================================
+Token trata_digito(Token T);                    // Faz a analise/geracao dos Tokens numericos
+Token trata_pontuacao(Token T);                 // Faz a analise/geracao dos Tokens de pontuacao
+Token trata_operador_aritmetico(Token T);       // Faz a analise/geracao dos Tokens de operador aritmetico
+Token trata_operador_relacional(Token T);       // Faz a analise/geracao dos Tokens de operador relacional
+Token trata_atribuicao(Token T);                // Faz a analise/geracao dos Tokens de atribuicao
+Token trata_identificador_palavra(Token T);     // Faz a analise/geracao dos Tokens de identificadores
+Token Pega_Token(Token T);                      // Funcao que verifica qual tipo de Token foi encontrado
+Token Analisador_Lexico(Token T);               // Funcao que desconsidera tudo que é espaco, tab, enter, comentario {}
+
+
+// Analisadores Sintaticos, Semantico e Geracao de Codigo  ==================================================================
+/* Verifica se a estrutura do codigo esta correta, se os identificadores foram declarados corretamente e faz a geracao de codigo */
+void Analisador_sintatico(Token T);                   
+Token Analisa_bloco(Token T);                           
+Token Analisa_et_variavel(Token T);                     
+Token Analisa_variaveis(Token T);                       
+Token Analisa_Tipo(Token T);                          
+Token Analisa_subrotinas(Token T);                      
 Token Analisa_declaracao_procedimento(Token T);
 Token Analisa_declaracao_funcao(Token T);
 Token Analisa_comandos(Token T);
@@ -74,20 +84,34 @@ int Precedencia_atual(Token T);
 char *Verifica_Tipo_Posfixa();
 char *Pesquisa_Tipo(char* simbolo);
 
+// Funcao Gera Codigo
 void Gera_Codigo(char* rot, char* comando, char* tipo1, char* tipo2);
 
-// Funcoes de Pesquisa na Tabela de Simbolos
-int Pesquisa_duplicvar_tabela(char* nome_variavel);
-void Pesquisa_tipo_tabela(char* simbolo);
-int Pesquisa_declvar_tabela(char* nome_variavel);
-int Pesquisa_primeira_marca_tabela();
-int Pesquisa_declfuncao_existe_tabela(char* nome_variavel);
-int Pesquisa_declproc_tabela(char* nome_procedimento);
-int Pesquisa_declfunc_tabela(char* nome_funcao);
-int Pesquisa_champroc_tabela(char* nome_procedimento);
-int Pesquisa_chamfuncao_tabela(char* nome_funcao);
+// Funcoes de Pesquisa na Tabela de Simbolos ==============================================================================
+int Pesquisa_duplicvar_tabela(char* nome_variavel);         // Funcao para pesquisar se a variavel ja foi declarada ate a primeira marca
+void Pesquisa_tipo_tabela(char* simbolo);                   // Funcao para pequisar o tipo do identificador na tabela
+int Pesquisa_declvar_tabela(char* nome_variavel);           // Funcao para pesquisar em toda a tabela se a variavel ja foi declarada
+int Pesquisa_primeira_marca_tabela();                       // Pequisa em qual funcao se encontra para pegar o tipo
+int Pesquisa_declfuncao_existe_tabela(char* nome_variavel); // Pesquisa se a funcao ja foi declarada (faz a busca na tabela inteira)
+int Pesquisa_declproc_tabela(char* nome_procedimento);      // Verifica se o procedimento ja foi declarado ate a primeira marca
+int Pesquisa_declfunc_tabela(char* nome_funcao);            // Verifica se a funcao ja foi declarada ate a primeira marca
+int Pesquisa_champroc_tabela(char* nome_procedimento);      // Verifica se a procedimento ja foi declarada (faz a busca na tabela inteira)
+int Pesquisa_chamfuncao_tabela(char* nome_funcao);          // Verifica se a funcao ja foi declarada (faz a busca na tabela inteira)
 void Desempilha_volta_nivel(Pilha* p);
 
+// Dicionario da pilha ======================================================================================================s
+// ORDEM:  lexema - escopo - tipo - memoria 
+
+// escopo = 1: procedimento / funcao / programa
+// escopo = 0: nada
+
+// tipo = 0: nao declarado
+// tipo = 1: nome do programa
+// tipo = 2: var inteiro
+// tipo = 3: var booleano
+// tipo = 4: procedimento
+// tipo = 5: funcao inteiro
+// tipo = 6: funcao booleano
 
 // Funcao Principal =========================================================================================================
 
@@ -1459,7 +1483,7 @@ char *Pesquisa_Tipo(char* simbolo){
 // Analisador Semantico =======================================================================================================
 
 int Pesquisa_duplicvar_tabela(char* nome_variavel){
-    // Verifica se a variavel ja foi declarada
+    // Verifica se a variavel ja foi declarada ate a primeira marca
     if(consulta_variavel_escopo(pilha, nome_variavel) != NULL){
         return 1; // Retorna 1 se a variavel foi declarada
     }
@@ -1467,13 +1491,14 @@ int Pesquisa_duplicvar_tabela(char* nome_variavel){
 }
 
 void Pesquisa_tipo_tabela(char* simbolo){
+    // Pesquisa na tabela o tipo do identificador
     No* q = pilha->Topo;
     while(q != NULL && q->escopo == 0){
         if(q->tipo == 0){
             if(strcmp(simbolo, "sinteiro") == 0){
-                q->tipo = 2;
+                q->tipo = 2;    // var inteiro
             } else if(strcmp(simbolo, "sbooleano") == 0){
-                q->tipo = 3;
+                q->tipo = 3;    // var booleano
             }
         }
         q = q->prox;
@@ -1481,15 +1506,15 @@ void Pesquisa_tipo_tabela(char* simbolo){
 }
 
 int Pesquisa_declvar_tabela(char* nome_variavel){
-    // Verifica se a variavel ja foi declarada
+    // Verifica se a variavel ja foi declarada (faz a busca na tabela inteira)
     if(consulta_primeira_ocorrencia_variavel(pilha, nome_variavel) != NULL){
-        return consulta_primeira_ocorrencia_variavel(pilha, nome_variavel)->memoria;
+        return consulta_primeira_ocorrencia_variavel(pilha, nome_variavel)->memoria;    // retorna a memoria
     }
-    return -1;
+    return -1;  // retorna -1 se nao foi declarada
 }
 
 int Pesquisa_declfuncao_existe_tabela(char* nome_variavel){
-    // Verifica se a variavel ja foi declarada
+    // Verifica se a funcao ja foi declarada (faz a busca na tabela inteira)
     if(consulta_primeira_ocorrencia_funcao_existe(pilha, nome_variavel) != NULL){
         return consulta_primeira_ocorrencia_funcao_existe(pilha, nome_variavel)->memoria;
     }
@@ -1497,7 +1522,7 @@ int Pesquisa_declfuncao_existe_tabela(char* nome_variavel){
 }
 
 int Pesquisa_declproc_tabela(char* nome_procedimento){
-    // Verifica se o procedimento ja foi declarado
+    // Verifica se o procedimento ja foi declarado ate a primeira marca
     if(consulta_procedimento_escopo(pilha, nome_procedimento) != NULL){
         return 1;
     }
@@ -1505,7 +1530,7 @@ int Pesquisa_declproc_tabela(char* nome_procedimento){
 }
 
 int Pesquisa_declfunc_tabela(char* nome_funcao){
-    // Verifica se a funcao ja foi declarada
+    // Verifica se a funcao ja foi declarada ate a primeira marca
     if(consulta_funcao_escopo(pilha, nome_funcao) != NULL){
         return 1;
     }
@@ -1513,7 +1538,7 @@ int Pesquisa_declfunc_tabela(char* nome_funcao){
 }
 
 int Pesquisa_champroc_tabela(char* nome_procedimento){
-    // Verifica se a funcao ja foi declarada
+    // Verifica se a procedimento ja foi declarada (faz a busca na tabela inteira)
     if(consulta_primeira_ocorrencia_procedimento(pilha, nome_procedimento) != NULL){
         return consulta_primeira_ocorrencia_procedimento(pilha, nome_procedimento)->memoria;
     }
@@ -1521,7 +1546,7 @@ int Pesquisa_champroc_tabela(char* nome_procedimento){
 }
 
 int Pesquisa_chamfuncao_tabela(char* nome_funcao){
-    // Verifica se a funcao ja foi declarada
+    // Verifica se a funcao ja foi declarada (faz a busca na tabela inteira)
     if(consulta_primeira_ocorrencia_funcao(pilha, nome_funcao) != NULL){
         return consulta_primeira_ocorrencia_funcao(pilha, nome_funcao)->memoria;
     }
@@ -1529,6 +1554,7 @@ int Pesquisa_chamfuncao_tabela(char* nome_funcao){
 }
 
 int Pesquisa_primeira_marca_tabela(){
+    // Pequisa em qual funcao se encontra para pegar o tipo
     if(consulta_escopo(pilha) != NULL){
         return consulta_escopo(pilha)->tipo; 
     }
