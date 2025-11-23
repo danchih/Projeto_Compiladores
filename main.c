@@ -135,6 +135,11 @@ int main(int argc, char *argv[])
 
     // arquivo = fopen("teste.txt", "r");
     // nome_arquivo = "teste.obj";
+    arquivo_obj = fopen(nome_arquivo, "w");
+    if (arquivo_obj == NULL) {
+        perror("Erro ao criar arquivo OBJ");
+    }
+    fclose(arquivo_obj);
 
     Token T;
     pilha = CriaPilha();
