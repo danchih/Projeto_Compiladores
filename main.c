@@ -939,20 +939,22 @@ Token Analisa_escreva(Token T){
                 sprintf(end_str, "%d", end_retorno);
                 Gera_Codigo(" ", "LDV", end_str, " ");
                 Gera_Codigo(" ", "PRN", " ", " ");
-                
-                char *tipo = Pesquisa_Tipo(T.lexema);
-                if(strcmp(tipo, "#") != 0){
-                    printf("[%d] Erro: tipo da variavel '%s' diferente do tipo esperado no comando escreva \n", linha, T.lexema);
-                }
-                T = Analisador_Lexico(T);
-                if(strcmp(T.simbolo, "sfecha_parenteses")== 0){
-                    T = Analisador_Lexico(T);
-                } else {
-                    printf("[%d] Erro: ausencia de ')' no final do comando ESCREVA \n", linha);
-                }
+
             }else{
                 printf("[%d] Erro: variavel/funcao '%s' nao declarada anteriormente\n", linha, T.lexema);
             }
+
+            char *tipo = Pesquisa_Tipo(T.lexema);
+            if(strcmp(tipo, "#") != 0){
+                printf("[%d] Erro: tipo da variavel '%s' diferente do tipo esperado no comando escreva \n", linha, T.lexema);
+            }
+            T = Analisador_Lexico(T);
+            if(strcmp(T.simbolo, "sfecha_parenteses")== 0){
+                T = Analisador_Lexico(T);
+            } else {
+                printf("[%d] Erro: ausencia de ')' no final do comando ESCREVA \n", linha);
+            }
+            
         } else {
             printf("[%d] Erro ao fazer a escrita (necessario um identificador) \n", linha);
         }
